@@ -4,6 +4,7 @@ from urllib.parse import quote
 import pandas as pd
 import pytest
 
+import pipeline.import_applyhome_csv as applyhome_importer
 from pipeline.build_features import build_features
 from pipeline.collect_public_api import (
     _fetch_odcloud_rows,
@@ -26,6 +27,10 @@ from pipeline.collect_subscription_pdf import (
     promote_manual_cutoff_template,
 )
 from pipeline.common import TRAINING_COLUMNS
+from pipeline.import_applyhome_csv import (
+    import_applyhome_cutoffs,
+    import_applyhome_public_supply,
+)
 from pipeline.preprocess import preprocess
 
 
@@ -186,6 +191,107 @@ def test_parse_special_supply_rows_sums_count_columns():
 
     assert df.loc[0, "house_manage_no"] == "2026000001"
     assert df.loc[0, "total_special_request_count"] == 7
+
+
+def test_import_applyhome_public_supply_converts_local_csvs(tmp_path, monkeypatch):
+    monkeypatch.setattr(applyhome_importer, "PUBLIC_SUPPLY_OUTPUT_PATH", tmp_path / "public_apartment_supply.csv")
+    monkeypatch.setattr(applyhome_importer, "COMPETITION_OUTPUT_PATH", tmp_path / "apt_competition.csv")
+    pd.DataFrame(
+        [
+            {
+                "HOUSE_MANAGE_NO": "2026000001",
+                "PBLANC_NO": "2026000001",
+                "HOUSE_NM": "테스트 아파트",
+                "SUBSCRPT_AREA_CODE": "100",
+                "SUBSCRPT_AREA_CODE_NM": "서울",
+                "RCRIT_PBLANC_DE": "2026-04-01",
+                "TOT_SUPLY_HSHLDCO": "120",
+            }
+        ]
+    ).to_csv(tmp_path / "apt_lttot_pblanc_detail.csv", index=False)
+    pd.DataFrame(
+        [
+            {
+                "HOUSE_MANAGE_NO": "2026000001",
+                "PBLANC_NO": "2026000001",
+                "MODEL_NO": "1",
+                "HOUSE_TY": "084.9700A",
+                "SUPLY_HSHLDCO": "80",
+                "LTTOT_TOP_AMOUNT": "75000",
+            }
+        ]
+    ).to_csv(tmp_path / "apt_lttot_pblanc_model.csv", index=False)
+    pd.DataFrame(
+        [
+            {
+                "HOUSE_MANAGE_NO": "2026000001",
+                "PBLANC_NO": "2026000001",
+                "MODEL_NO": "1",
+                "HOUSE_TY": "084.9700A",
+                "REQ_CNT": "1000",
+                "CMPET_RATE": "12.5",
+            }
+        ]
+    ).to_csv(tmp_path / "apt_lttot_pblanc_competition.csv", index=False)
+
+    path = import_applyhome_public_supply(tmp_path)
+    df = pd.read_csv(path)
+
+    assert df.loc[0, "apartment_id"] == 2026000001
+    assert df.loc[0, "region_code"] == 11
+    assert df.loc[0, "general_supply_units"] == 80
+    assert df.loc[0, "sale_price"] == 75000
+    assert df.loc[0, "competition_rate"] == 12.5
+    assert df.loc[0, "area_m2"] == 84.97
+
+
+def test_import_applyhome_cutoffs_uses_lowest_winning_score(tmp_path, monkeypatch):
+    monkeypatch.setattr(applyhome_importer, "CUTOFF_OUTPUT_PATH", tmp_path / "subscription_cutoffs.csv")
+    pd.DataFrame(
+        [
+            {
+                "HOUSE_MANAGE_NO": "2026000001",
+                "PBLANC_NO": "2026000001",
+                "HOUSE_NM": "테스트 아파트",
+                "SUBSCRPT_AREA_CODE": "100",
+                "SUBSCRPT_AREA_CODE_NM": "서울",
+                "RCRIT_PBLANC_DE": "2026-04-01",
+                "TOT_SUPLY_HSHLDCO": "120",
+            }
+        ]
+    ).to_csv(tmp_path / "apt_lttot_pblanc_detail.csv", index=False)
+    pd.DataFrame(
+        [
+            {
+                "HOUSE_MANAGE_NO": "2026000001",
+                "PBLANC_NO": "2026000001",
+                "MODEL_NO": "1",
+                "HOUSE_TY": "084.9700A",
+                "RESIDE_SENM": "해당지역",
+                "LWET_SCORE": "55",
+                "AVRG_SCORE": "60",
+                "TOP_SCORE": "70",
+            },
+            {
+                "HOUSE_MANAGE_NO": "2026000001",
+                "PBLANC_NO": "2026000001",
+                "MODEL_NO": "1",
+                "HOUSE_TY": "084.9700A",
+                "RESIDE_SENM": "기타지역",
+                "LWET_SCORE": "50",
+                "AVRG_SCORE": "58",
+                "TOP_SCORE": "68",
+            },
+        ]
+    ).to_csv(tmp_path / "apt_lttot_pblanc_score.csv", index=False)
+
+    path = import_applyhome_cutoffs(tmp_path)
+    df = pd.read_csv(path)
+
+    assert df.loc[0, "apartment_id"] == 2026000001
+    assert df.loc[0, "apartment_name"] == "테스트 아파트"
+    assert df.loc[0, "area_m2"] == 84.97
+    assert df.loc[0, "cutoff_score"] == 50
 
 
 def test_fetch_odcloud_rows_decodes_encoded_service_key(monkeypatch):

@@ -3,6 +3,7 @@ from pathlib import Path
 import pandas as pd
 
 from pipeline.common import RAW_DIR, ensure_data_dirs, read_sample_training_dataset, write_csv
+from pipeline.import_applyhome_csv import has_applyhome_cutoff_files, import_applyhome_cutoffs
 
 MANUAL_CUTOFF_PATH = RAW_DIR / "subscription_home" / "manual_subscription_cutoffs.csv"
 MANUAL_CUTOFF_TEMPLATE_PATH = RAW_DIR / "subscription_home" / "manual_subscription_cutoffs_template.csv"
@@ -94,6 +95,8 @@ def promote_manual_cutoff_template() -> Path:
 
 def collect_subscription_pdf() -> Path:
     ensure_data_dirs()
+    if has_applyhome_cutoff_files():
+        return import_applyhome_cutoffs()
     if _has_filled_cutoff_scores(MANUAL_CUTOFF_TEMPLATE_PATH):
         promote_manual_cutoff_template()
     elif not MANUAL_CUTOFF_PATH.exists():

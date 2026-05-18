@@ -9,6 +9,10 @@ import pandas as pd
 from dotenv import load_dotenv
 
 from pipeline.common import RAW_DIR, ensure_data_dirs, read_sample_training_dataset, write_csv
+from pipeline.import_applyhome_csv import (
+    has_applyhome_public_supply_files,
+    import_applyhome_public_supply,
+)
 
 
 load_dotenv()
@@ -273,6 +277,8 @@ def collect_public_api(use_fallback: bool = True) -> Path:
     ensure_data_dirs()
     service_key = os.getenv("PUBLIC_DATA_API_KEY", "")
     if not service_key:
+        if has_applyhome_public_supply_files():
+            return import_applyhome_public_supply()
         if not use_fallback:
             raise RuntimeError("PUBLIC_DATA_API_KEY가 설정되어 있지 않습니다.")
         if OUTPUT_PATH.exists():

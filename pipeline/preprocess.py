@@ -48,8 +48,11 @@ def preprocess() -> Path:
         on="region_code",
         how="left",
     )
+    fallback_housing_price_index = merged["housing_price_index"].median()
+    if pd.isna(fallback_housing_price_index):
+        fallback_housing_price_index = 100.0
     merged["housing_price_index"] = merged["housing_price_index"].fillna(
-        merged["housing_price_index"].median()
+        fallback_housing_price_index
     )
     merged = merged.dropna(subset=["cutoff_score", "region_code", "general_supply_units"])
     if merged.empty:
