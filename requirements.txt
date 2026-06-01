@@ -6,6 +6,7 @@ psycopg[binary]
 pandas
 numpy
 scikit-learn
+lightgbm
 joblib
 python-dotenv
 pytest

@@ -14,3 +14,7 @@ __pycache__/
 .DS_Store
 
 model_artifacts/artifacts/*.joblib
+model_artifacts/final/
+
+data/processed/*.csv
+data/raw/applyhome/

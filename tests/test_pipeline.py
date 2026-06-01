@@ -56,7 +56,16 @@ def test_create_manual_cutoff_template_creates_editable_csv():
     assert {"apartment_id", "apartment_name", "region_name", "area_m2", "cutoff_score"}.issubset(df.columns)
 
 
-def test_create_manual_cutoff_template_from_public_supply_creates_blank_cutoff_template():
+def test_create_manual_cutoff_template_from_public_supply_creates_blank_cutoff_template(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "pipeline.collect_subscription_pdf.MANUAL_CUTOFF_TEMPLATE_PATH",
+        tmp_path / "manual_subscription_cutoffs_template.csv",
+    )
+    monkeypatch.setattr(
+        "pipeline.collect_subscription_pdf.PUBLIC_SUPPLY_PATH",
+        tmp_path / "missing_public_apartment_supply.csv",
+    )
+
     path = create_manual_cutoff_template_from_public_supply(overwrite=True)
     df = pd.read_csv(path)
 

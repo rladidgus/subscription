@@ -75,3 +75,27 @@ def test_run_analysis_uses_sample_apartments_when_request_has_no_apartments():
     assert body["used_sample_apartments"] is True
     total_matches = sum(len(body["matched_apartments"][key]) for key in ["available_now", "prepare_later", "difficult"])
     assert total_matches >= 20
+
+
+def test_applyhome_cutoff_endpoint_returns_real_predictions():
+    response = client.post(
+        "/predict/applyhome-cutoff",
+        json={"apartment_name": "골드클래스 시그니처", "limit": 1},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["results"]) == 1
+    assert body["results"][0]["apartment_name"] == "골드클래스 시그니처"
+
+
+def test_applyhome_classify_endpoint_groups_candidates():
+    response = client.post(
+        "/predict/applyhome-classify",
+        json={"user_score": 50, "apartment_name": "골드클래스 시그니처", "limit": 1},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    total = sum(len(body[key]) for key in ["available_now", "prepare_later", "difficult"])
+    assert total == 1

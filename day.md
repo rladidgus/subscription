@@ -4,16 +4,21 @@
 
 ## 현재 상태 요약
 
-- FastAPI 스켈레톤과 기본 API 라우터는 있다.
-- `/health`, `/score/calculate`, `/score/simulate`, `/predict/cutoff`, `/match/apartments`, `/strategy/generate` 라우터가 분리되어 있다.
-- 점수 계산, 미래 시뮬레이션, 단지 매칭, 전략 생성은 임시 구현 수준이다.
+- FastAPI 스켈레톤과 기본 API 라우터는 구현되어 있다.
+- `/health`, `/score/calculate`, `/score/simulate`, `/predict/cutoff`, `/match/apartments`, `/strategy/generate`, `/analysis/run` 라우터가 분리되어 있다.
+- 점수 계산, 미래 시뮬레이션, 단지 매칭, 전략 생성은 서비스 레이어로 분리되어 있으며 기본 테스트 대상이다.
+- 무주택 기간, 부양가족 수, 청약통장 가입기간 점수 상한과 일부 예외 경고가 코드에 반영되어 있다.
 - 커트라인 예측은 아직 ML 모델이 아니라 `baseline-fallback` 규칙 기반으로 동작한다.
-- PostgreSQL 연결 설정은 있으나 실제 테이블 설계와 repository 구현은 미완성이다.
+- CSV 기반 repository는 샘플 단지, processed 단지, 학습 데이터셋을 읽고 schema 객체로 변환할 수 있다.
+- PostgreSQL 연결 설정과 연결 확인 함수는 있으나 실제 테이블 설계와 DB repository는 미완성이다.
 - 데이터 수집/전처리 파이프라인은 기본 동작한다.
   - ApplyHome 로컬 CSV를 기존 표준 데이터셋으로 변환할 수 있다.
   - `public_apartment_supply.csv`, `apt_competition.csv`, `subscription_cutoffs.csv`, `training_dataset.csv` 생성이 가능하다.
+  - `data/sample/sample_apartment_candidates.csv`와 `data/processed/apartment_candidates.csv`는 각각 25개 후보 단지를 가진다.
+  - `data/processed/training_dataset.csv`는 현재 6,832행이다.
   - R-ONE 주택가격지수는 현재 샘플 수준이라 지역별 실제 지수 보강이 필요하다.
 - 학습, 평가 파이프라인은 아직 실제 ML 모델 생성 단계까지 구현되지 않았다.
+- `model_artifacts/reports/metrics.json`, `feature_importance.csv`는 placeholder 수준이며, `model_artifacts/artifacts/`에는 아직 실제 `.joblib` 모델이 없다.
 - 프론트엔드는 이 저장소 범위가 아니며, 백엔드 JSON API만 구현한다.
 
 ## 최근 완료된 내용
@@ -55,7 +60,18 @@
   - `competition_rate`
   - `housing_price_index`
   - `cutoff_score`
-- 현재 로컬 Python 환경에는 `pytest`가 설치되어 있지 않아 전체 테스트 실행은 보류 상태이다.
+- 현재 셸에서 `pytest --version` 실행 시 `command not found`가 발생하므로 전체 테스트 실행은 보류 상태이다.
+
+### API 및 repository 구현 진척
+
+- `POST /analysis/run`이 추가되어 점수 시뮬레이션, 커트라인 예측, 단지 매칭, 전략 생성을 한 번에 수행한다.
+- 요청에 후보 단지가 없으면 샘플 단지 CSV를 사용하도록 fallback이 구현되어 있다.
+- `app/db/repository.py`에서 아래 데이터를 읽고 검증한다.
+  - `data/sample/sample_apartment_candidates.csv`
+  - `data/processed/apartment_candidates.csv`
+  - `data/processed/training_dataset.csv`
+- repository는 필수 컬럼 누락 시 `RepositoryDataError`를 발생시킨다.
+- SQLite 엔진을 사용한 DB 연결 확인 테스트가 있다.
 
 ## 1단계: 실행 환경 및 기본 API 점검
 
@@ -65,9 +81,9 @@
 
 ### 해야 할 일
 
-- conda 환경을 활성화한다.
+- 확인 필요: conda 환경을 활성화한다.
   - `conda activate subscription`
-- 의존성을 설치한다.
+- 진행 필요: 의존성을 설치한다.
   - `pip install -r requirements.txt`
 - `.env`에 필요한 값을 확인한다.
   - `APP_NAME`
@@ -75,11 +91,11 @@
   - `CORS_ORIGINS`
   - `PUBLIC_DATA_API_KEY`
   - `OPENAI_API_KEY`
-- 테스트 실행이 가능한지 확인한다.
+- 진행 필요: 테스트 실행이 가능한지 확인한다.
   - `pytest`
-- API 서버 실행을 확인한다.
+- 진행 필요: API 서버 실행을 확인한다.
   - `uvicorn app.main:app --reload`
-- 기본 API를 확인한다.
+- 완료: 기본 API 라우터 코드는 구현되어 있다.
   - `GET /health`
   - `POST /score/calculate`
   - `POST /score/simulate`
@@ -106,11 +122,11 @@
 
 ### 해야 할 일
 
-- 무주택 기간 점수표를 상수로 분리한다.
-- 부양가족 수 점수표를 상수로 분리한다.
-- 청약통장 가입기간 점수표를 상수로 분리한다.
-- 입력값이 점수 계산 대상이 아닌 경우 `warnings`에 사유를 담는다.
-- 미래 시뮬레이션에서 무주택 기간과 청약통장 가입기간 증가 규칙을 명확히 검증한다.
+- 완료: 무주택 기간, 부양가족 수, 청약통장 가입기간의 최대값과 점수 상한을 상수로 분리했다.
+- 완료: 유주택자의 무주택기간 미반영, 만 30세 미만 미혼 무주택자, 부양가족/청약통장 상한 경고를 `warnings`에 담는다.
+- 완료: 미래 시뮬레이션에서 무주택자일 때만 무주택 기간을 증가시키고 청약통장 가입기간을 증가시킨다.
+- 보완 필요: 실제 청약 가점표와 현재 계산식이 완전히 일치하는지 최종 대조가 필요하다.
+- 보완 필요: 만 30세 미만 미혼 무주택자의 미래 시뮬레이션에서 나이 증가를 반영할지 정책을 결정해야 한다.
 
 ### 완료 기준
 
@@ -135,20 +151,22 @@
 
 ### 해야 할 일
 
-- `POST /analysis/run` 엔드포인트를 추가한다.
-- 분석 요청/응답 Pydantic schema를 추가한다.
-- 처리 흐름을 하나로 연결한다.
+- 완료: `POST /analysis/run` 엔드포인트를 추가했다.
+- 완료: 분석 요청/응답 Pydantic schema를 추가했다.
+- 완료: 처리 흐름을 하나로 연결했다.
   - 현재 점수 계산
   - 미래 점수 계산
   - 후보 단지 커트라인 예측
   - 단지 매칭
   - 전략 문장 생성
-- 기존 개별 API는 유지한다.
+- 완료: 기존 개별 API는 유지한다.
+- 보완 필요: 후보 단지가 없을 때 현재는 빈 결과가 아니라 샘플 단지 fallback을 사용한다. API 명세에 이 동작을 명확히 적어야 한다.
+- 보완 필요: 샘플 fallback 사용 시 `predictions`가 빈 배열로 내려가므로, 필요하면 샘플 단지의 예측/매칭 정보 구조를 더 일관되게 맞춘다.
 
 ### 완료 기준
 
 - `POST /analysis/run`이 현재 점수, 미래 점수, 예측 커트라인, 단지 분류, 전략 문장을 한 번에 반환한다.
-- 후보 단지가 비어 있어도 명확한 빈 결과를 반환한다.
+- 후보 단지가 비어 있으면 `used_sample_apartments=true`와 샘플 단지 매칭 결과를 반환한다.
 - 통합 API 테스트가 추가되고 통과한다.
 
 ### 관련 파일
@@ -167,15 +185,16 @@
 
 ### 해야 할 일
 
-- 먼저 CSV 기반 repository를 안정화한다.
+- 완료: 먼저 CSV 기반 repository를 안정화한다.
   - `data/sample/sample_apartment_candidates.csv`
   - `data/processed/apartment_candidates.csv`
-- PostgreSQL 테이블 설계는 데이터 컬럼이 확정된 뒤 진행한다.
-- repository 함수 역할을 분리한다.
+- 완료: 학습 데이터셋 CSV 로딩과 필수 컬럼 검증을 추가했다.
+- 진행 필요: PostgreSQL 테이블 설계는 데이터 컬럼이 확정된 뒤 진행한다.
+- 부분 완료: repository 함수 역할을 분리한다.
   - 후보 단지 목록 조회
   - 학습 데이터 조회
-  - 예측 결과 저장 또는 조회
-- `DATABASE_URL` 기반 연결이 정상 동작하는지 확인한다.
+  - 진행 필요: 예측 결과 저장 또는 조회
+- 부분 완료: 연결 확인 함수는 있으나 실제 `DATABASE_URL` 기반 PostgreSQL 연결 검증은 남아 있다.
 
 ### 완료 기준
 
@@ -198,10 +217,11 @@
 
 ### 해야 할 일
 
-- 샘플 후보 단지 데이터를 최소 20개 이상으로 늘린다.
-- 지역, 예상 커트라인, 점수대가 다양하게 나오도록 샘플을 구성한다.
-- repository에서 읽은 후보 단지를 예측/매칭 입력으로 변환한다.
-- 매칭 결과를 `available_now`, `prepare_later`, `difficult`로 안정적으로 분류한다.
+- 완료: 샘플 후보 단지 데이터를 최소 20개 이상으로 늘렸다.
+- 완료: `sample_apartment_candidates.csv`와 `apartment_candidates.csv`는 현재 header 포함 26줄, 실제 후보 25개다.
+- 완료: repository에서 읽은 후보 단지를 `ApartmentPrediction` schema로 변환한다.
+- 완료: 매칭 결과를 `available_now`, `prepare_later`, `difficult`로 분류한다.
+- 보완 필요: 샘플 데이터의 지역, 커트라인, 점수대 다양성이 실제 추천 시나리오를 충분히 대표하는지 추가 점검한다.
 
 ### 완료 기준
 
@@ -277,7 +297,9 @@
 
 - 완료: 모델 학습에 사용할 `data/processed/training_dataset.csv`를 실제 ApplyHome 기반 데이터로 만들 수 있다.
 - 진행 필요: 현재 `pipeline/train_model.py`는 모델 파일 경로만 생성하는 수준이다.
-- 진행 필요: `pipeline/evaluate_model.py`와 `services/cutoff_predictor.py`를 실제 모델 기반으로 연결해야 한다.
+- 진행 필요: 현재 `pipeline/evaluate_model.py`는 metrics placeholder 파일만 생성하는 수준이다.
+- 진행 필요: `services/cutoff_predictor.py`는 아직 모델 로드 없이 `baseline-fallback` 규칙만 사용한다.
+- 진행 필요: `model_artifacts/artifacts/`에는 실제 모델 파일이 없다.
 
 ### 해야 할 일
 
@@ -318,17 +340,17 @@
 
 - 로컬 환경에 테스트 의존성을 설치한다.
   - `pip install -r requirements.txt`
-- 전체 테스트를 정리한다.
+- 진행 필요: 전체 테스트를 실행하고 결과를 확정한다.
   - 점수 계산 테스트
   - 미래 시뮬레이션 테스트
   - 커트라인 예측 테스트
   - 단지 매칭 테스트
   - API 테스트
   - ApplyHome CSV 변환 테스트
-- `README.md`에 실행 방법을 추가한다.
-- `.env` 필수 값 목록을 문서화한다.
-- `APPLYHOME_CSV_DIR` 사용 방법을 문서화한다.
-- 주요 API 요청/응답 예시를 문서화한다.
+- 진행 필요: `README.md`에 실행 방법을 추가한다.
+- 진행 필요: `.env` 필수 값 목록을 문서화한다.
+- 진행 필요: `APPLYHOME_CSV_DIR` 사용 방법을 문서화한다.
+- 진행 필요: 주요 API 요청/응답 예시를 문서화한다.
 - `agent.md`와 실제 파일 구조가 계속 일치하는지 확인한다.
 
 ### 완료 기준
@@ -348,10 +370,11 @@
 ## 우선순위 요약
 
 1. 로컬 환경에 `pytest`를 포함한 의존성 설치 후 전체 테스트 실행
-2. ApplyHome 기반 `training_dataset.csv` 품질 점검
-3. R-ONE 주택가격지수 실제 데이터 보강
-4. ML 학습/평가/예측 모델 연결
-5. `services/cutoff_predictor.py`를 모델 기반 예측으로 교체
-6. CSV 기반 repository와 통합 분석 API가 새 데이터셋을 사용하도록 점검
-7. 비APT/특수 청약 파일 활용 범위 별도 설계
-8. README, agent.md, day.md 문서 정리
+2. 실제 청약 가점표와 `services/score_calculator.py` 계산식 최종 대조
+3. ApplyHome 기반 `training_dataset.csv` 품질 점검
+4. R-ONE 주택가격지수 실제 데이터 보강
+5. ML 학습/평가/예측 모델 연결
+6. `services/cutoff_predictor.py`를 모델 기반 예측으로 교체하고 fallback 유지
+7. PostgreSQL 테이블 설계와 DB repository 구현
+8. 비APT/특수 청약 파일 활용 범위 별도 설계
+9. README, agent.md, day.md 문서 정리
