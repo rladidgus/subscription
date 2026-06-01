@@ -1,0 +1,3 @@
+apartment_id,apartment_name,region_name,area_m2,cutoff_score
+sample-001,샘플 아파트 1,서울,84,48
+sample-002,샘플 아파트 2,경기,84,42
