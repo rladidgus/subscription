@@ -22,6 +22,7 @@ class CutoffPredictionResponse(BaseModel):
 
 class ApplyHomeCandidateFilter(BaseModel):
     apartment_name: str | None = None
+    region_code: str | None = None
     house_manage_no: str | None = None
     pblanc_no: str | None = None
     model_no: str | None = None
@@ -44,9 +45,15 @@ class ApplyHomePredictionResult(BaseModel):
     announcement_date: str | None = None
     reside_secd: str
     subscription_rank_code: str
-    predicted_cutoff_score: float
+    predicted_cutoff_score: float | None
     actual_cutoff_score: float | None = None
     model_name: str
+    prediction_status: str = "predicted"
+    shortage_probability: float | None = None
+    competition_probability: float | None = None
+    region_mae: float | None = None
+    region_confidence_level: str | None = None
+    region_confidence_label: str | None = None
     confidence_note: str
 
 
@@ -57,19 +64,27 @@ class ApplyHomePredictionResponse(BaseModel):
 class ApplyHomeClassificationRequest(BaseModel):
     user_score: float = Field(ge=0, le=84)
     margin: float = Field(default=5, ge=0, le=20)
-    candidates: list[ApplyHomeCandidateFilter] = []
+    candidates: list[ApplyHomeCandidateFilter] = Field(default_factory=list)
     apartment_name: str | None = None
+    is_eligible: bool = True
+    eligibility_reasons: list[str] = Field(default_factory=list)
     limit: int = Field(default=20, ge=1, le=100)
 
 
 class ApplyHomeClassifiedResult(ApplyHomePredictionResult):
     user_score: float
-    score_gap: float
+    score_gap: float | None
     category: str
     category_label: str
+    support_level: str
+    support_label: str
+    support_note: str
+    eligibility_status: str = "eligible"
+    eligibility_reasons: list[str] = Field(default_factory=list)
 
 
 class ApplyHomeClassificationResponse(BaseModel):
     available_now: list[ApplyHomeClassifiedResult]
     prepare_later: list[ApplyHomeClassifiedResult]
     difficult: list[ApplyHomeClassifiedResult]
+    not_eligible: list[ApplyHomeClassifiedResult] = Field(default_factory=list)

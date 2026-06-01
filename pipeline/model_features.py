@@ -268,6 +268,7 @@ def load_or_build_model_feature_dataset() -> pd.DataFrame:
 
 def find_applyhome_feature_rows(
     apartment_name: str | None = None,
+    region_code: str | None = None,
     house_manage_no: str | None = None,
     pblanc_no: str | None = None,
     model_no: str | None = None,
@@ -281,6 +282,8 @@ def find_applyhome_feature_rows(
 
     if apartment_name:
         filtered = filtered[filtered["HOUSE_NM"].fillna("").str.contains(apartment_name, case=False, regex=False)]
+    if region_code:
+        filtered = filtered[filtered["region_code"].astype(str).str.strip() == str(region_code).strip()]
 
     lookup_pairs = [
         ("HOUSE_MANAGE_NO", _normalize_lookup_value(house_manage_no)),

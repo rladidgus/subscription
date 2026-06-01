@@ -27,6 +27,7 @@ from pipeline.collect_subscription_pdf import (
     promote_manual_cutoff_template,
 )
 from pipeline.common import TRAINING_COLUMNS
+from pipeline.evaluate_model import evaluate_region_performance
 from pipeline.import_applyhome_csv import (
     import_applyhome_cutoffs,
     import_applyhome_public_supply,
@@ -340,4 +341,28 @@ def test_build_features_creates_processed_training_dataset():
 
     assert path.exists()
     assert list(df.columns) == TRAINING_COLUMNS
+    assert not df.empty
+
+
+def test_evaluate_region_performance_creates_region_report():
+    path = evaluate_region_performance()
+    df = pd.read_csv(path)
+
+    assert path.exists()
+    assert {
+        "region_code",
+        "region_name",
+        "actual_count",
+        "mae",
+        "rmse",
+        "hurdle_mae_all",
+        "segment_soft_mae_all",
+        "hurdle_mae_nonzero",
+        "segment_soft_mae_nonzero",
+        "hybrid_mae_all",
+        "hybrid_mae_nonzero",
+        "best_model_all",
+        "best_model_nonzero",
+        "confidence_level",
+    }.issubset(df.columns)
     assert not df.empty

@@ -50,7 +50,8 @@ def test_predict_applyhome_cutoff_uses_real_feature_rows():
     result = response.results[0]
     assert result.apartment_name == "골드클래스 시그니처"
     assert 0 <= result.predicted_cutoff_score <= 84
-    assert result.model_name.startswith("LightGBM")
+    assert result.model_name == "LightGBM-Hybrid"
+    assert result.prediction_status in {"segment_soft", "shortage_or_zero"}
 
 
 def test_classify_applyhome_candidates_groups_by_user_score():
@@ -64,4 +65,42 @@ def test_classify_applyhome_candidates_groups_by_user_score():
 
     total = len(response.available_now) + len(response.prepare_later) + len(response.difficult)
     assert total == 1
-    assert response.available_now[0].category_label == "지원 가능"
+    assert response.available_now[0].category_label == "지원 최적"
+    assert response.available_now[0].support_level == "optimal"
+    assert response.available_now[0].region_mae is not None
+
+
+def test_classify_applyhome_candidates_skips_model_when_user_is_ineligible():
+    response = classify_applyhome_candidates(
+        ApplyHomeClassificationRequest(
+            user_score=50,
+            apartment_name="골드클래스 시그니처",
+            is_eligible=False,
+            eligibility_reasons=["청약통장 가입기간 미달"],
+            limit=1,
+        )
+    )
+
+    assert len(response.not_eligible) == 1
+    result = response.not_eligible[0]
+    assert result.predicted_cutoff_score is None
+    assert result.model_name == "rule-based-eligibility-filter"
+    assert result.category_label == "신청 불가"
+    assert result.support_level == "not_eligible"
+    assert result.eligibility_reasons == ["청약통장 가입기간 미달"]
+
+
+def test_classify_applyhome_candidates_marks_uncertain_when_gap_is_inside_region_error():
+    response = classify_applyhome_candidates(
+        ApplyHomeClassificationRequest(
+            user_score=35,
+            apartment_name="골드클래스 시그니처",
+            limit=1,
+        )
+    )
+
+    assert len(response.prepare_later) == 1
+    result = response.prepare_later[0]
+    assert result.category_label == "가능하지만 불안"
+    assert result.support_level == "uncertain"
+    assert "지역 평균 오차" in result.support_note

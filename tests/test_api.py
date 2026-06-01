@@ -99,3 +99,25 @@ def test_applyhome_classify_endpoint_groups_candidates():
     body = response.json()
     total = sum(len(body[key]) for key in ["available_now", "prepare_later", "difficult"])
     assert total == 1
+    assert body["available_now"][0]["support_level"] == "optimal"
+    assert body["available_now"][0]["region_mae"] is not None
+
+
+def test_applyhome_classify_endpoint_skips_ineligible_user():
+    response = client.post(
+        "/predict/applyhome-classify",
+        json={
+            "user_score": 50,
+            "apartment_name": "골드클래스 시그니처",
+            "is_eligible": False,
+            "eligibility_reasons": ["청약통장 가입기간 미달"],
+            "limit": 1,
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["not_eligible"]) == 1
+    assert body["not_eligible"][0]["predicted_cutoff_score"] is None
+    assert body["not_eligible"][0]["category_label"] == "신청 불가"
+    assert body["not_eligible"][0]["support_level"] == "not_eligible"

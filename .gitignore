@@ -6,6 +6,7 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+notebooks/.matplotlib_cache/
 
 *.db
 *.sqlite
@@ -13,8 +14,11 @@ __pycache__/
 
 .DS_Store
 
+frontend/node_modules/
+frontend/dist/
+frontend/*.tsbuildinfo
+
 model_artifacts/artifacts/*.joblib
 model_artifacts/final/
 
-data/processed/*.csv
-data/raw/applyhome/
+__MACOSX/
